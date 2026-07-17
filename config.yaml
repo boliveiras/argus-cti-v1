@@ -1,0 +1,49 @@
+# ============================================================================
+# argus-cti — configuracao
+# Chaves de API NUNCA ficam aqui: use o .env (veja .env.example).
+# ============================================================================
+
+# -- LLM (curador) -----------------------------------------------------------
+# provider: anthropic | openai | gemini   (chave correspondente no .env)
+llm:
+  provider: gemini
+  model: gemini-flash-latest        # ex: gpt-4o (openai) | gemini-2.5-flash (gemini)
+  max_tokens: 8000
+  temperature: 0.2
+  timeout: 180        # segundos por chamada (modelos com 'thinking' podem demorar)
+
+# -- Caminhos de saida (relativos a raiz do projeto, ou absolutos) -----------
+paths:
+  reports: ./reports                       # PDFs diarios
+  catalog: ./catalog/catalogo-cti.xlsx     # catalogo Excel (dedup + relevancia)
+  nessus_db: ./nessus/db                   # snapshots SQLite do Tenable/Nessus
+  logs: ./logs                             # logs estruturados JSONL
+
+# -- Fontes (feeds RSS/Atom) --------------------------------------------------
+sources:
+  - https://feeds.feedburner.com/TheHackersNews
+  - https://www.bleepingcomputer.com/feed/
+  - https://www.securityweek.com/feed/
+  - https://www.darkreading.com/rss.xml
+  - https://www.helpnetsecurity.com/feed/
+  - https://www.cisoadvisor.com.br/feed/
+  - https://www.cybersecuritydive.com/feeds/news/
+
+# Maximo de noticias por boletim
+max_news: 10
+
+# Tecnologias monitoradas (vazio = modo GERAL). Com itens, a triagem prioriza
+# essas tecnologias e o PDF marca os titulos correspondentes com um pin.
+technologies: []
+#  - fortinet
+#  - vmware
+#  - windows server
+
+# -- Tenable.io / Nessus (opcional, fail-secure) -------------------------------
+# Sem TENABLE_ACCESS_KEY/TENABLE_SECRET_KEY no .env o boletim roda normalmente,
+# apenas sem a correlacao "CVE da noticia existe no meu ambiente?".
+tenable:
+  enabled: true
+  sync_interval_days: 1        # 1 snapshot por dia em <paths.nessus_db>/DD-MM-AAAA/
+  max_assets_display: 10       # maximo de ativos listados na caixa do PDF
+ 

@@ -1,0 +1,33 @@
+# ── Segredos (nunca versionar) ───────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials*.json
+
+# ── Saidas de runtime (boletins, catalogo, cache Nessus, logs) ─
+reports/
+catalog/
+nessus/
+logs/
+*.pdf
+*.xlsx
+*.xls
+*.jsonl
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# ── Python / caches ──────────────────────────────────────────
+__pycache__/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.venv/
+venv/

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 420" fill="none" role="img" aria-label="Argus — Cyber Threat Intelligence">
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eaf2fb"/><stop offset="1" stop-color="#9db2cd"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5cc2ff"/><stop offset="1" stop-color="#2b85db"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0.4" cy="0.35" r="0.78">
+      <stop offset="0" stop-color="#d6ecff"/><stop offset="0.45" stop-color="#2f93de"/><stop offset="1" stop-color="#0e4d8a"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="360" height="420" rx="28" fill="#070c16"/>
+
+  <!-- Emblema (olho-radar) — design de 32u escalado x6, centrado em (180,150) -->
+  <g transform="translate(84,54) scale(6)">
+    <circle cx="16" cy="16" r="13.4" stroke="url(#steel)" stroke-width="1.2" opacity="0.85"/>
+    <g stroke="url(#steel)" stroke-width="1.6" stroke-linecap="round">
+      <path d="M16 1.4V5"/><path d="M16 27V30.6"/><path d="M1.4 16H5"/><path d="M27 16H30.6"/>
+    </g>
+    <path d="M3.6 16 Q16 6 28.4 16" stroke="url(#blue)" stroke-width="1.9" stroke-linecap="round"/>
+    <path d="M3.6 16 Q16 25.6 28.4 16" stroke="url(#steel)" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+    <circle cx="16" cy="16" r="6.1" fill="url(#iris)"/>
+    <circle cx="16" cy="16" r="6.1" stroke="#bfe4ff" stroke-width="0.5" opacity="0.45"/>
+    <circle cx="16" cy="16" r="4.0" stroke="#cfe9ff" stroke-width="0.5" opacity="0.5"/>
+    <g stroke="#dbefff" stroke-width="0.4" opacity="0.4"><path d="M16 10.6v10.8"/><path d="M10.6 16h10.8"/></g>
+    <circle cx="16" cy="16" r="2.3" fill="#06223f"/>
+    <circle cx="18" cy="13.5" r="1.05" fill="#ffffff" opacity="0.92"/>
+  </g>
+
+  <text x="180" y="338" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif"
+        font-size="58" font-weight="800" letter-spacing="10" fill="url(#steel)">ARGUS</text>
+  <text x="180" y="372" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif"
+        font-size="14" font-weight="700" letter-spacing="6" fill="#33a3ef">CYBER THREAT INTELLIGENCE</text>
+</svg>

@@ -1,0 +1,50 @@
+# CANÔNICO — copie para a raiz de cada projeto novo como `.pre-commit-config.yaml`.
+# Gate de segurança/qualidade VERSIONADO (viaja no clone). Hooks 'local' usam os binários
+# já instalados na máquina. Polyglot: cada hook só dispara quando há arquivo do tipo dele.
+#
+# Ativar no repo (1x por clone):  pre-commit install
+#   (com o git template dir global configurado, `git init`/`git clone` já instala sozinho)
+# Rodar manual em tudo:           pre-commit run --all-files
+# Pular (emergência):             git commit --no-verify
+minimum_pre_commit_version: "3.0.0"
+
+repos:
+  - repo: local
+    hooks:
+      # SCA + secret + misconfig (agnóstico de linguagem) — sempre roda.
+      - id: trivy
+        name: trivy (SCA + secret + misconfig)
+        entry: trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 --quiet .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # SAST shell — só quando há arquivos shell no commit.
+      # --severity=warning: pega bug/quoting/word-splitting/uso inseguro; ignora info/style.
+      - id: shellcheck
+        name: shellcheck (SAST shell)
+        entry: shellcheck --severity=warning
+        language: system
+        types: [shell]
+
+      # SAST Python (Bandit; semgrep nativo Windows quebra) — só em .py.
+      - id: bandit
+        name: bandit (SAST Python)
+        entry: bandit -ll -ii -q
+        language: system
+        types: [python]
+
+      # Lint Python — só em .py.
+      - id: ruff
+        name: ruff (lint Python)
+        entry: ruff check
+        language: system
+        types: [python]
+
+      # SAST PowerShell — só quando há .ps1/.psm1/.psd1 no commit.
+      - id: psscriptanalyzer
+        name: PSScriptAnalyzer (SAST PowerShell)
+        entry: pwsh -NoProfile -Command "$r = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1; if ($r) { $r | Format-Table -AutoSize; exit 1 }"
+        language: system
+        files: \.(ps1|psm1|psd1)$
+        pass_filenames: false
