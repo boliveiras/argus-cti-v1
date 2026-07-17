@@ -184,9 +184,10 @@ ferramenta. A escolha certa de banco às vezes é uma planilha.
 
 ## Segurança
 
-Projeto classificado como **Tier 1** (CLI local, sem rede de entrada, sem
-auth, sem multiusuário) do meu padrão de arquitetura — o que significa aplicar
-o núcleo inegociável:
+Por ser uma ferramenta de linha de comando que roda localmente — sem porta
+aberta, sem autenticação, sem multiusuário — os controles foram dimensionados
+para o risco real dela: proteger segredos, desconfiar de tudo que entra e
+falhar de forma segura.
 
 - **Segredos**: só no `.env` (gitignored) ou variável de ambiente; o YAML
   nunca carrega chave; mensagens de erro e logs nunca ecoam segredo. A chave
@@ -206,9 +207,10 @@ o núcleo inegociável:
   (SAST) e Ruff (lint) — baseline zerado; supressões só com justificativa
   escrita no código.
 
-N/A por não ter a superfície: MFA, RBAC, headers web, rate limiting de
-entrada, HA/DR e SIEM próprio (os logs são integráveis, mas a ferramenta não
-opera um).
+Controles como MFA, RBAC, headers web, rate limiting de entrada e alta
+disponibilidade não se aplicam aqui de propósito: a ferramenta não expõe
+serviço nem gerencia usuários — adicioná-los seria complexidade sem redução
+de risco. Se um dia ela virar API ou serviço multiusuário, essa conta muda.
 
 ## Licença
 
