@@ -28,8 +28,14 @@ os títulos para o LLM fazer a triagem por prioridade real de CTI: exploração
 ativa, zero-days, ransomware, APTs, vazamentos e patches críticos — descartando
 release de marketing e opinião sem evidência.
 
-Para cada notícia aprovada, baixa o texto do artigo original e pede ao LLM a
-estruturação completa, em português. Aqui vale a **Regra Mestra** do projeto:
+Quando a mesma história aparece em mais de uma fonte, nada se perde: a
+triagem agrupa as coberturas, o texto de todas elas entra no prompt e a
+estruturação consolida os fatos, CVEs, TTPs e IOCs numa única notícia — o
+detalhe que só o BleepingComputer publicou soma-se ao que só o The Hacker News
+trouxe, e todas as URLs ficam registradas como fonte.
+
+Para cada história aprovada, baixa o texto do(s) artigo(s) original(is) e pede
+ao LLM a estruturação completa, em português. Aqui vale a **Regra Mestra** do projeto:
 TTPs e IOCs alimentam bloqueio em produção e regras de SIEM, então **nada pode
 ser inventado** — o prompt restringe a extração ao texto fornecido e o código
 valida tudo de forma determinística depois (formato de CVE, IDs de técnica

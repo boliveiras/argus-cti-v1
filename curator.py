@@ -17,7 +17,11 @@ CVE_RE = re.compile(r"^CVE-\d{4}-\d{4,}$")
 TTP_RE = re.compile(r"^T\d{4}(\.\d{3})?$")
 CRITICIDADES = {"CRITICO", "ALTO", "MEDIO", "BAIXO", "INFO"}
 IOC_TIPOS = {"IP", "Dominio C2", "URL C2", "SHA256", "MD5", "E-mail",
-             "Pacote npm", "Pacote PyPI", "Arquivo", "Caca (SIEM)"}
+             "Pacote npm", "Pacote PyPI", "Arquivo", "Hunting (SIEM)"}
+# Nomenclatura: "Hunting" e o termo padrao nos relatorios; variantes em PT
+# vindas do LLM sao normalizadas antes da validacao.
+_TIPO_ALIASES = {"caca (siem)": "Hunting (SIEM)", "caça (siem)": "Hunting (SIEM)",
+                 "hunting": "Hunting (SIEM)", "hunt (siem)": "Hunting (SIEM)"}
 DEFANG_TIPOS = {"Dominio C2", "URL C2", "E-mail"}
 
 
@@ -32,11 +36,15 @@ SYSTEM_CURADOR = (
     "TTPs: usa apenas as informacoes presentes no material fornecido no prompt."
 )
 
-_PRIORIDADES = (
-    "vulnerabilidades criticas (CVSS alto), exploracao ativa e zero-days; "
-    "ransomware e grupos APT; vazamentos de dados e phishing relevante; "
-    "novas TTPs e patches criticos de grandes fornecedores"
-)
+# Fallbacks usados quando o config.yaml nao define `priority` / `ignore`
+_PRIORIDADES_DEFAULT = [
+    "vulnerabilidades criticas (CVSS alto)", "exploracao ativa", "zero-day",
+    "ransomware", "APT", "vazamento de dados", "phishing relevante",
+    "novas TTPs", "patches criticos de grandes fornecedores",
+]
+_IGNORE_DEFAULT = [
+    "conteudo promocional", "opiniao sem evidencia tecnica",
+]
 
 
 def _parse_json(text: str):
@@ -77,11 +85,15 @@ def defang(valor: str) -> str:
 
 
 def select_news(client, candidatos: list[dict], max_select: int,
-                technologies: list[str]) -> list[dict]:
+                technologies: list[str], priorities: list[str] | None = None,
+                ignores: list[str] | None = None) -> list[dict]:
     """Pede ao LLM a triagem das candidatas mais relevantes para CTI.
-    Retorna as candidatas escolhidas com o campo `tecnologia` sugerido."""
+    `priorities`/`ignores` vem do config.yaml (secoes `priority` e `ignore`);
+    ausentes -> defaults de CTI. Retorna as escolhidas com `tecnologia`."""
     if not candidatos:
         return []
+    prioridades = "; ".join(str(p) for p in (priorities or _PRIORIDADES_DEFAULT) if p)
+    exclusoes = "; ".join(str(i) for i in (ignores or _IGNORE_DEFAULT) if i)
     linhas = "\n".join(f"{i}. {c['titulo']}" for i, c in enumerate(candidatos))
     foco = (f"FOCO: priorize noticias das tecnologias monitoradas: "
             f"{', '.join(technologies)}. Complete com noticias gerais se faltar.\n"
@@ -89,15 +101,19 @@ def select_news(client, candidatos: list[dict], max_select: int,
     user = (
         f"Candidatas coletadas nos feeds (indice. titulo):\n{linhas}\n\n"
         f"{foco}"
-        f"Selecione ate {max_select} noticias com maior valor para um time "
-        f"SOC/CSIRT/DFIR, priorizando: {_PRIORIDADES}. "
-        "Exclua conteudo promocional, opiniao sem evidencia tecnica e itens repetidos "
-        "(mesma historia em fontes diferentes: escolha 1). "
-        "Para cada escolhida identifique a tecnologia principal no formato curto "
+        f"Selecione ate {max_select} HISTORIAS com maior valor para um time "
+        f"SOC/CSIRT/DFIR, priorizando (em ordem): {prioridades}. "
+        f"Exclua: {exclusoes}. "
+        "Quando a MESMA historia aparecer em mais de uma fonte, NAO descarte: "
+        "agrupe — escolha o indice da cobertura mais completa em 'i' e liste os "
+        "indices das demais coberturas da mesma historia em 'duplicatas' (as fontes "
+        "extras serao lidas e consolidadas na mesma noticia do boletim). "
+        "Para cada historia identifique a tecnologia principal no formato curto "
         "'Fornecedor Produto' (ex: 'Fortinet FortiGate'); use \"\" se for noticia geral "
         "sem tecnologia especifica (campanhas, prisoes, relatorios).\n\n"
-        'Responda apenas: [{"i": <indice>, "tecnologia": "..."}, ...] '
-        "ordenado do mais para o menos relevante."
+        'Responda apenas: [{"i": <indice>, "duplicatas": [<indices>], "tecnologia": "..."}, ...] '
+        "ordenado do mais para o menos relevante ('duplicatas' = [] quando a historia "
+        "so aparece em uma fonte)."
     )
     data = _parse_json(client.generate(SYSTEM_CURADOR, user))
     if not isinstance(data, list):
@@ -115,23 +131,55 @@ def select_news(client, candidatos: list[dict], max_select: int,
         vistos.add(idx)
         sel = dict(candidatos[idx])
         sel["tecnologia"] = str(item.get("tecnologia") or "").strip()
+        # Coberturas extras da mesma historia (consolidadas na estruturacao).
+        # Cap de 2 extras: limita o tamanho do prompt sem perder as fontes ricas.
+        extras = []
+        for d_idx in (item.get("duplicatas") or []):
+            try:
+                d_idx = int(d_idx)
+            except (TypeError, ValueError):
+                continue
+            if d_idx == idx or d_idx in vistos or not 0 <= d_idx < len(candidatos):
+                continue
+            vistos.add(d_idx)
+            extras.append(candidatos[d_idx])
+            if len(extras) >= 2:
+                break
+        sel["extras"] = extras
         out.append(sel)
         if len(out) >= max_select:
             break
     return out
 
 
-def structure_news(client, sel: dict, article_text: str) -> dict:
-    """Estrutura uma noticia selecionada em dict validado do boletim."""
-    material = article_text or "(texto do artigo indisponivel — use apenas o titulo; " \
-                               "nesse caso ttps e iocs DEVEM ser listas vazias)"
+def structure_news(client, sel: dict, article_texts: list[tuple[str, str]]) -> dict:
+    """Estrutura uma historia em dict validado do boletim.
+
+    `article_texts` = [(url, texto), ...] — quando a mesma historia foi coberta
+    por mais de uma fonte, TODOS os textos entram no prompt e o LLM consolida
+    as informacoes (uniao de fatos, CVEs, TTPs e IOCs), sem perder o que so
+    aparece em uma das coberturas."""
+    urls = [u for u, _ in article_texts] or [sel.get("url", "")]
+    blocos = []
+    for i, (u, txt) in enumerate(article_texts, 1):
+        corpo = txt or "(texto indisponivel nesta fonte)"
+        blocos.append(f"--- FONTE {i}: {u} ---\n{corpo}")
+    material = "\n\n".join(blocos) or (
+        "(texto do artigo indisponivel — use apenas o titulo; "
+        "nesse caso ttps e iocs DEVEM ser listas vazias)")
+    consolidacao = (
+        "Ha mais de uma fonte cobrindo a MESMA historia: consolide TODAS as "
+        "informacoes relevantes em uma unica noticia — uniao de fatos, CVEs, "
+        "TTPs e IOCs de todas as fontes, sem duplicar itens equivalentes. Em "
+        "caso de divergencia entre fontes, prefira o dado mais especifico.\n\n"
+        if len(article_texts) > 1 else "")
     user = (
         "Estruture a noticia abaixo para o boletim diario de CTI, em portugues do "
         "Brasil, sem jargao excessivo.\n\n"
         f"TITULO ORIGINAL: {sel['titulo']}\n"
-        f"URL: {sel['url']}\n"
         f"TECNOLOGIA (sugerida na triagem): {sel.get('tecnologia', '')}\n\n"
-        f"TEXTO DO ARTIGO (unica fonte de verdade):\n{material}\n\n"
+        f"{consolidacao}"
+        f"TEXTO DAS FONTES (unica fonte de verdade):\n{material}\n\n"
         "REGRA MESTRA — NUNCA FABRICAR: cves, ttps e iocs so podem conter o que esta "
         "escrito no TEXTO acima. IOC copiado caractere a caractere. TTP so com "
         "comportamento concreto descrito no texto (campo contexto obrigatorio citando "
@@ -150,16 +198,16 @@ def structure_news(client, sel: dict, article_text: str) -> dict:
         '  "ttps": [{"id": "T1190", "nome": "nome oficial MITRE ATT&CK", '
         '"contexto": "comportamento descrito no texto"}],\n'
         '  "iocs": [{"tipo": "IP|Dominio C2|URL C2|SHA256|MD5|E-mail|Pacote npm|'
-        'Pacote PyPI|Arquivo|Caca (SIEM)", "valor": "..."}]\n'
+        'Pacote PyPI|Arquivo|Hunting (SIEM)", "valor": "..."}]\n'
         "}"
     )
     data = _parse_json(client.generate(SYSTEM_CURADOR, user))
     if not isinstance(data, dict):
         raise CurationError("Estruturacao: esperado um objeto JSON")
-    return validate_noticia(data, fonte_url=sel["url"])
+    return validate_noticia(data, fonte_urls=urls)
 
 
-def validate_noticia(d: dict, fonte_url: str) -> dict:
+def validate_noticia(d: dict, fonte_urls: list[str]) -> dict:
     """Validacao deterministica da saida do LLM (nao confiavel por definicao)."""
     def txt(key, obrigatorio=True):
         v = str(d.get(key) or "").strip()
@@ -174,7 +222,7 @@ def validate_noticia(d: dict, fonte_url: str) -> dict:
         "proteger": txt("proteger"),
         "impacto": txt("impacto"),
         "tecnologia": txt("tecnologia", obrigatorio=False),
-        "fontes": [fonte_url],
+        "fontes": [u for u in fonte_urls if u],
     }
 
     acoes = [str(a).strip() for a in (d.get("acoes") or []) if str(a).strip()]
@@ -207,6 +255,7 @@ def validate_noticia(d: dict, fonte_url: str) -> dict:
         if not isinstance(i, dict):
             continue
         tipo = str(i.get("tipo") or "").strip()
+        tipo = _TIPO_ALIASES.get(tipo.lower(), tipo)
         valor = str(i.get("valor") or "").strip()
         if not valor or tipo not in IOC_TIPOS:
             continue

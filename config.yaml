@@ -10,7 +10,7 @@ llm:
   model: gemini-flash-latest        # ex: gpt-4o (openai) | gemini-2.5-flash (gemini)
   max_tokens: 8000
   temperature: 0.2
-  timeout: 180        # segundos por chamada (modelos com 'thinking' podem demorar)
+  timeout: 200        # segundos por chamada (modelos com 'thinking' podem demorar)
 
 # -- Caminhos de saida (relativos a raiz do projeto, ou absolutos) -----------
 paths:
@@ -19,18 +19,50 @@ paths:
   nessus_db: ./nessus/db                   # snapshots SQLite do Tenable/Nessus
   logs: ./logs                             # logs estruturados JSONL
 
-# -- Fontes (feeds RSS/Atom) --------------------------------------------------
+# -- Fontes (feeds RSS/Atom — sempre a URL do FEED, nunca a homepage) ---------
 sources:
+  # Internacionais
   - https://feeds.feedburner.com/TheHackersNews
   - https://www.bleepingcomputer.com/feed/
   - https://www.securityweek.com/feed/
   - https://www.darkreading.com/rss.xml
   - https://www.helpnetsecurity.com/feed/
-  - https://www.cisoadvisor.com.br/feed/
   - https://www.cybersecuritydive.com/feeds/news/
+  - https://cybersecuritynews.com/feed/
+  - https://cybersecurityventures.com/feed/
+  - https://krebsonsecurity.com/feed/
+  - https://www.schneier.com/feed/atom/
+  - https://therecord.media/feed/
+  - https://feeds.feedburner.com/eset/blog          # WeLiveSecurity (ESET)
+  # Brasil
+  - https://www.cisoadvisor.com.br/feed/
+  - https://www.cybersecbrazil.com.br/blog-feed.xml
+  # Governo/advisories
+  - https://www.cisa.gov/cybersecurity-advisories/all.xml   # CISA vem reduzindo RSS; se parar, o coletor apenas avisa
 
 # Maximo de noticias por boletim
-max_news: 10
+max_news: 15
+
+# -- Criterios de triagem (injetados no prompt do LLM curador) ----------------
+# priority: o que o curador prioriza, em ordem. ignore: o que descarta.
+# Remover as secoes volta aos defaults de CTI embutidos no codigo.
+priority:
+  - vulnerabilidades criticas
+  - exploracao ativa
+  - zero-day
+  - ransomware
+  - APT
+  - vazamento de dados
+  - phishing
+  - fraude
+  - patches criticos
+  - iocs
+  - ttps
+
+ignore:
+  - conteudo promocional
+  - opiniao sem evidencia tecnica
+  - noticias duplicadas sem atualizacao
 
 # Tecnologias monitoradas (vazio = modo GERAL). Com itens, a triagem prioriza
 # essas tecnologias e o PDF marca os titulos correspondentes com um pin.

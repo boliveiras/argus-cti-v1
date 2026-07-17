@@ -103,7 +103,9 @@ def main(argv=None) -> int:
 
     # -- Triagem LLM + filtros deterministicos (relevancia antes de duplicata) -
     try:
-        selecionadas = curator.select_news(client, candidatos, max_news * 2, technologies)
+        selecionadas = curator.select_news(
+            client, candidatos, max_news * 2, technologies,
+            priorities=cfg.get("priority"), ignores=cfg.get("ignore"))
     except (curator.CurationError, llm_client.LLMError) as e:
         print(f"ERRO na triagem LLM: {e}")
         log_event(logs, "erro_triagem", erro=str(e)[:300])
@@ -111,8 +113,9 @@ def main(argv=None) -> int:
 
     finais, ign_rel, ign_dup = [], [], []
     for sel in selecionadas:
+        urls_historia = [sel["url"]] + [e["url"] for e in sel.get("extras", [])]
         cand = {"titulo": sel["titulo"], "tecnologia": sel.get("tecnologia", ""),
-                "fontes": [sel["url"]]}
+                "fontes": urls_historia}
         irr, motivo = is_irrelevant(cand, known)
         if irr:
             ign_rel.append(motivo)
@@ -134,12 +137,19 @@ def main(argv=None) -> int:
               "ou foram filtradas por relevancia.")
         return 0
 
-    # -- Estruturacao por noticia (texto real do artigo no prompt) -------------
+    # -- Estruturacao por historia: consolida o texto de TODAS as fontes ------
     noticias = []
     for sel in finais:
-        texto = collector.fetch_article_text(sel["url"])
+        textos = [(sel["url"], collector.fetch_article_text(sel["url"]))]
+        for extra in sel.get("extras", []):
+            t = collector.fetch_article_text(extra["url"])
+            if t:                       # fonte extra ilegivel nao entra no prompt
+                textos.append((extra["url"], t))
+        if len(textos) > 1:
+            log_event(logs, "consolidando_fontes", titulo=sel["titulo"][:80],
+                      fontes=len(textos))
         try:
-            noticias.append(curator.structure_news(client, sel, texto))
+            noticias.append(curator.structure_news(client, sel, textos))
         except (curator.CurationError, llm_client.LLMError) as e:
             log_event(logs, "falha_estruturacao", titulo=sel["titulo"][:90],
                       erro=str(e)[:200])

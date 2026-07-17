@@ -251,7 +251,10 @@ def build_iocs_table(iocs):
     rows = [[Paragraph("IOCS — BLOQUEIO TEMPESTIVO  |  firewall / EDR / proxy / e-mail",
                        st_sec), ""],
             [Paragraph("TIPO", st_ith), Paragraph("VALOR", st_ith)]]
-    tipo_display = {"caca (siem)": "Hunting (SIEM)", "caça (siem)": "Hunting (SIEM)"}
+    # "Hunting" e o termo padrao nos relatorios; variantes legadas em PT
+    # (dados antigos/LLM) sao convertidas na renderizacao.
+    tipo_display = {"caca (siem)": "Hunting (SIEM)", "caça (siem)": "Hunting (SIEM)",
+                    "hunting": "Hunting (SIEM)"}
     for i in iocs:
         if isinstance(i, dict):
             tipo, valor = i.get("tipo", ""), i.get("valor", "")
