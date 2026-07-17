@@ -16,6 +16,7 @@ Uso:
 import argparse
 import json
 import sys
+import time
 from datetime import date
 
 import requests
@@ -139,7 +140,9 @@ def main(argv=None) -> int:
 
     # -- Estruturacao por historia: consolida o texto de TODAS as fontes ------
     noticias = []
-    for sel in finais:
+    for i_sel, sel in enumerate(finais):
+        if i_sel:
+            time.sleep(2)   # espaca as chamadas ao LLM (evita rajada em pico de demanda)
         textos = [(sel["url"], collector.fetch_article_text(sel["url"]))]
         for extra in sel.get("extras", []):
             t = collector.fetch_article_text(extra["url"])

@@ -14,7 +14,11 @@ import time
 import requests
 
 TIMEOUT = 120          # segundos por requisicao
-RETRIES = 2            # tentativas extras em 429/5xx
+RETRIES = 3            # tentativas extras em 429/5xx
+# Backoff para sobrecarga do provedor (429/503/529): esperas mais longas do
+# que para erro de rede — picos de demanda duram dezenas de segundos.
+BACKOFF_OVERLOAD = (5, 15, 45)
+BACKOFF_NETWORK = (2, 4, 8)
 
 DEFAULT_MODELS = {
     "anthropic": "claude-sonnet-4-5",
@@ -55,13 +59,13 @@ class LLMClient:
                 last = e
                 status = e.response.status_code if e.response is not None else 0
                 if status in (429, 500, 502, 503, 529) and attempt < RETRIES:
-                    time.sleep(2 ** (attempt + 1))
+                    time.sleep(BACKOFF_OVERLOAD[min(attempt, len(BACKOFF_OVERLOAD) - 1)])
                     continue
                 break
             except requests.RequestException as e:
                 last = e
                 if attempt < RETRIES:
-                    time.sleep(2 ** (attempt + 1))
+                    time.sleep(BACKOFF_NETWORK[min(attempt, len(BACKOFF_NETWORK) - 1)])
                     continue
         if isinstance(last, requests.HTTPError) and last.response is not None:
             detail = f" HTTP {last.response.status_code}: {last.response.text[:300]}"
