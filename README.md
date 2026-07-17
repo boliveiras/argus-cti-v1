@@ -4,7 +4,9 @@ Curador diário de Cyber Threat Intelligence. Ele lê o noticiário de seguranç
 pelo analista, escolhe o que importa, extrai o que é acionável e entrega um
 boletim PDF pronto para o time de SOC/CSIRT/DFIR começar o dia.
 
-![Capa do boletim](assets/argus-logo.svg)
+<p align="center">
+  <img src="assets/argus-logo.svg" alt="Argus — Cyber Threat Intelligence" width="200">
+</p>
 
 ## O que é
 
@@ -145,6 +147,15 @@ Preencha `TENABLE_ACCESS_KEY`/`TENABLE_SECRET_KEY` no `.env` e pronto. Sem as
 chaves o boletim roda normalmente — a correlação é *fail-secure* e nunca trava
 a geração. Os snapshots diários em SQLite também servem de base histórica para
 KPIs de exposição.
+
+> ⚠️ **Avalie o risco antes de habilitar.** Este é um passo adicional e
+> **opcional** — a ferramenta entrega valor completo sem ele. Ao ativá-lo,
+> você baixa para a máquina local um retrato das vulnerabilidades abertas do
+> seu ambiente (CVEs por ativo, hostname, IP). Se essa máquina for
+> comprometida, esse cache vira um mapa pronto do que atacar. Se optar por
+> usar: rode em estação confiável com disco criptografado e acesso restrito,
+> use chaves de API somente-leitura, e trate os PDFs gerados como TLP:AMBER
+> (o boletim já se reclassifica sozinho quando contém dados do ambiente).
 
 ## Tecnologia e motivações
 
