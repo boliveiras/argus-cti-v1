@@ -40,8 +40,10 @@ except ImportError:
 
 
 # ── Constantes de caminho ─────────────────────────────────────────────────────
+# Default so p/ uso standalone; o boletim passa paths["catalog"] do config.yaml.
+# Este modulo vive em core/; sobe um nivel para ancorar catalog/ na raiz.
 CATALOG_PATH = os.path.join(
-    os.path.dirname(__file__), "catalog", "catalogo-cti.xlsx"
+    os.path.dirname(os.path.dirname(__file__)), "catalog", "catalogo-cti.xlsx"
 )
 
 # Colunas do catálogo (1-based, letras para referência)

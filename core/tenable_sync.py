@@ -37,7 +37,9 @@ EXPORT_WAIT_MAX = 900      # segundos aguardando o export ficar pronto
 EXPORT_POLL_EVERY = 10     # intervalo de polling
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz do projeto (este modulo vive em core/; sobe um nivel para ancorar
+# .env e os fallbacks de logs/ e nessus/db na raiz).
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── Snapshots datados (nessus/db/DD-MM-AAAA/) ────────────────────────────────

@@ -78,13 +78,13 @@ flowchart TB
     subgraph config["configuração"]
         Y[config.yaml<br/>fontes, caminhos, LLM] --- Z[.env<br/>chaves de API]
     end
-    subgraph nucleo["pipeline (argus_cti.py)"]
-        B[collector.py] --> C[curator.py] --> P[pdf_generator.py]
-        K[catalog_checker.py] --> C
+    subgraph nucleo["pipeline (argus_cti.py → core/)"]
+        B[core/collector.py] --> C[core/curator.py] --> P[core/pdf_generator.py]
+        K[core/catalog_checker.py] --> C
         P --> K
-        T[tenable_sync.py] --> P
+        T[core/tenable_sync.py] --> P
     end
-    L[llm_client.py<br/>Anthropic / OpenAI / Gemini] --> C
+    L[core/llm_client.py<br/>Anthropic / OpenAI / Gemini] --> C
     Y --> nucleo
     Z --> L
     Z --> T

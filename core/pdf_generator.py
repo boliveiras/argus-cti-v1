@@ -26,7 +26,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz do projeto (este modulo vive em core/; sobe um nivel para achar assets/).
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGO_PNG = os.path.join(BASE_DIR, "assets", "argus-logo.png")
 BRAND_SUB = "CYBER THREAT INTELLIGENCE"
 
@@ -242,14 +243,13 @@ def build_ttps_table(ttps):
 
 
 def build_iocs_table(iocs):
-    """Tabela de IOCs para bloqueio tempestivo (firewall/EDR/proxy/e-mail)."""
+    """Tabela de IOCs (nem todo IOC listado e bloqueavel; sem apelo a bloqueio)."""
     st_ith = s("ith", fontSize=7, textColor=A_BLUE, fontName="Helvetica-Bold", leading=10)
     st_itp = s("itp", fontSize=7.5, textColor=A_BLUE, fontName="Helvetica-Bold", leading=10)
     st_ivl = s("ivl", fontSize=7.5, textColor=A_TEXT, fontName="Courier", leading=10,
                wordWrap="CJK")
     st_sec = s("sec2", fontSize=7.5, textColor=A_WHITE, fontName="Helvetica-Bold", leading=10)
-    rows = [[Paragraph("IOCS — BLOQUEIO TEMPESTIVO  |  firewall / EDR / proxy / e-mail",
-                       st_sec), ""],
+    rows = [[Paragraph("IOCS", st_sec), ""],
             [Paragraph("TIPO", st_ith), Paragraph("VALOR", st_ith)]]
     # "Hunting" e o termo padrao nos relatorios; variantes legadas em PT
     # (dados antigos/LLM) sao convertidas na renderizacao.

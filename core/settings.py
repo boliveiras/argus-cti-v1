@@ -15,7 +15,9 @@ from datetime import datetime, timezone
 
 import yaml
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz do projeto (este modulo vive em core/; sobe um nivel para ancorar
+# config.yaml, .env e os caminhos relativos de saida na raiz).
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Defaults de caminho — todos configuraveis via config.yaml (secao `paths`).
 DEFAULT_PATHS = {

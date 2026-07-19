@@ -21,13 +21,10 @@ from datetime import date
 
 import requests
 
-import collector
-import curator
-import llm_client
-import tenable_sync
-from catalog_checker import append_to_catalog, check_catalog, is_duplicate, is_irrelevant
-from pdf_generator import generate_pdf
-from settings import load_config, load_env, log_event, resolve_paths
+from core import collector, curator, llm_client, tenable_sync
+from core.catalog_checker import append_to_catalog, check_catalog, is_duplicate, is_irrelevant
+from core.pdf_generator import generate_pdf
+from core.settings import load_config, load_env, log_event, resolve_paths
 
 
 def main(argv=None) -> int:

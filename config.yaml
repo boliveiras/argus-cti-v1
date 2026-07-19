@@ -7,7 +7,7 @@
 # provider: anthropic | openai | gemini   (chave correspondente no .env)
 llm:
   provider: gemini
-  model: gemini-flash-latest        # ex: gpt-4o (openai) | gemini-2.5-flash (gemini)
+  model: gemini-pro-latest        # ex: gpt-4o (openai) | gemini-2.5-flash (gemini)
   max_tokens: 8000
   temperature: 0.2
   timeout: 200        # segundos por chamada (modelos com 'thinking' podem demorar)
@@ -37,11 +37,9 @@ sources:
   # Brasil
   - https://www.cisoadvisor.com.br/feed/
   - https://www.cybersecbrazil.com.br/blog-feed.xml
-  # Governo/advisories
-  - https://www.cisa.gov/cybersecurity-advisories/all.xml   # CISA vem reduzindo RSS; se parar, o coletor apenas avisa
 
 # Maximo de noticias por boletim
-max_news: 15
+max_news: 20
 
 # -- Criterios de triagem (injetados no prompt do LLM curador) ----------------
 # priority: o que o curador prioriza, em ordem. ignore: o que descarta.
