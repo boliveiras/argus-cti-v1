@@ -212,11 +212,11 @@ def build_nessus_box(info, tlp_label):
 
 
 def build_ttps_table(ttps):
-    """Tabela de TTPs (MITRE ATT&CK) — insumo para regras de SIEM."""
+    """Tabela de TTPs (MITRE ATT&CK)."""
     st_tid = s("tid", fontSize=8, textColor=A_BLUE, fontName="Courier-Bold", leading=11)
     st_tnm = s("tnm", fontSize=8, textColor=A_TEXT, fontName="Helvetica", leading=11)
     st_sec = s("sec", fontSize=7.5, textColor=A_WHITE, fontName="Helvetica-Bold", leading=10)
-    rows = [[Paragraph("TTPS — MITRE ATT&amp;CK  |  insumo para regras SIEM", st_sec), ""]]
+    rows = [[Paragraph("TTPS — MITRE ATT&amp;CK", st_sec), ""]]
     for t in ttps:
         if isinstance(t, dict):
             tid, nome, ctx = t.get("id", ""), t.get("nome", ""), t.get("contexto", "")
