@@ -14,7 +14,9 @@ reports/
 catalog/
 nessus/
 logs/
+log/
 *.pdf
+*.log
 *.xlsx
 *.xls
 *.jsonl

@@ -24,6 +24,7 @@ import requests
 from core import collector, curator, llm_client, tenable_sync
 from core.catalog_checker import append_to_catalog, check_catalog, is_duplicate, is_irrelevant
 from core.pdf_generator import generate_pdf
+from core.rfc5424 import SyslogLogger
 from core.settings import load_config, load_env, log_event, resolve_paths
 
 
@@ -52,6 +53,8 @@ def main(argv=None) -> int:
     paths = resolve_paths(cfg)
     env = load_env()
     logs = paths["logs"]
+    slog = SyslogLogger(paths["syslog"])   # syslog RFC 5424 em ./log (complementa o JSONL)
+    t0 = time.monotonic()
 
     max_news = args.max_news or int(cfg.get("max_news", 10))
     technologies = [t for t in (cfg.get("technologies") or []) if t]
@@ -62,7 +65,14 @@ def main(argv=None) -> int:
     except llm_client.LLMError as e:
         print(f"ERRO: {e}")
         log_event(logs, "erro_config_llm", erro=str(e))
+        slog.emit("ERROR", f"Falha na configuracao do LLM: {e}", severity="err")
         return 1
+
+    def _end(msg: str, severity: str = "notice", msgid: str = "END") -> None:
+        """Marca o termino da execucao no syslog com consumo (tokens/LLM/modelo)
+        e duracao. Chamado em todo ponto de saida apos o cliente existir."""
+        slog.emit(msgid, msg, severity=severity,
+                  duracao_s=round(time.monotonic() - t0, 2), **client.usage())
 
     if args.list_models:
         try:
@@ -82,11 +92,17 @@ def main(argv=None) -> int:
 
     log_event(logs, "inicio", provider=client.provider, model=client.model,
               modo=modo, max_news=max_news, dry_run=args.dry_run)
+    slog.emit("START", f"argus-cti iniciado (modo={modo}, max_news={max_news})",
+              severity="notice", provider=client.provider, model=client.model,
+              modo=modo, max_news=max_news, dry_run=str(args.dry_run).lower())
 
     # -- Catalogo: memoria de dedup + inteligencia de relevancia ---------------
     known = check_catalog(paths["catalog"])
     log_event(logs, "catalogo_carregado", titulos=len(known["titles"]),
               urls=len(known["urls"]), techs_classificadas=len(known["tech_relevance"]))
+    slog.emit("CATALOG_LOAD",
+              f"Catalogo carregado ({len(known['titles'])} titulos, {len(known['urls'])} urls)",
+              titulos=len(known["titles"]), urls=len(known["urls"]))
 
     # -- Coleta (fallback 48h se a janela padrao vier vazia) -------------------
     candidatos = collector.fetch_recent(cfg.get("sources"), hours=args.hours)
@@ -95,9 +111,14 @@ def main(argv=None) -> int:
         candidatos = collector.fetch_recent(cfg.get("sources"), hours=48)
     if not candidatos:
         log_event(logs, "sem_candidatas")
+        slog.emit("COLLECT", "Nenhuma noticia coletada nas fontes", severity="warning",
+                  candidatas=0)
+        _end("Execucao encerrada: sem candidatas coletadas")
         print("Nenhuma noticia coletada — verifique as fontes no config.yaml.")
         return 0
     log_event(logs, "coleta", candidatas=len(candidatos))
+    slog.emit("COLLECT", f"Coleta concluida ({len(candidatos)} candidatas)",
+              candidatas=len(candidatos))
 
     # -- Triagem LLM + filtros deterministicos (relevancia antes de duplicata) -
     try:
@@ -107,7 +128,10 @@ def main(argv=None) -> int:
     except (curator.CurationError, llm_client.LLMError) as e:
         print(f"ERRO na triagem LLM: {e}")
         log_event(logs, "erro_triagem", erro=str(e)[:300])
+        _end(f"Falha na triagem LLM: {str(e)[:120]}", severity="err", msgid="ERROR")
         return 1
+    slog.emit("TRIAGE", f"Triagem LLM concluida ({len(selecionadas)} historias)",
+              selecionadas=len(selecionadas))
 
     finais, ign_rel, ign_dup = [], [], []
     for sel in selecionadas:
@@ -128,9 +152,14 @@ def main(argv=None) -> int:
         if len(finais) >= max_news:
             break
 
+    slog.emit("FILTER",
+              f"Filtros aplicados ({len(finais)} novas, {len(ign_dup)} duplicatas, "
+              f"{len(ign_rel)} por relevancia)",
+              novas=len(finais), duplicatas=len(ign_dup), relevancia=len(ign_rel))
     if not finais:
         log_event(logs, "sem_noticias_novas", duplicatas=len(ign_dup),
                   relevancia=len(ign_rel))
+        _end("Execucao encerrada: nada novo (tudo catalogado ou filtrado)")
         print("Nada novo hoje: todas as candidatas ja estavam no catalogo "
               "ou foram filtradas por relevancia.")
         return 0
@@ -155,15 +184,22 @@ def main(argv=None) -> int:
                       erro=str(e)[:200])
     if not noticias:
         log_event(logs, "nada_estruturado")
+        _end("Falha: nenhuma noticia pode ser estruturada pelo LLM", severity="err",
+             msgid="ERROR")
         print("ERRO: nenhuma noticia pode ser estruturada pelo LLM.")
         return 1
+    slog.emit("STRUCTURE", f"Estruturacao concluida ({len(noticias)} noticias)",
+              noticias=len(noticias))
 
     # -- Correlacao Nessus (opcional, fail-secure) ------------------------------
     nessus_meta = tenable_sync.enrich_noticias(noticias, cfg=cfg, paths=paths, env=env)
+    slog.emit("ENRICH", f"Correlacao Nessus ({nessus_meta.get('matches', 0)} matches)",
+              matches=nessus_meta.get("matches", 0))
 
     if args.dry_run:
         print(json.dumps(noticias, ensure_ascii=False, indent=2, default=str))
         log_event(logs, "dry_run_fim", noticias=len(noticias))
+        _end(f"Execucao encerrada (dry-run, {len(noticias)} noticias)")
         return 0
 
     # -- PDF + catalogo ----------------------------------------------------------
@@ -177,6 +213,10 @@ def main(argv=None) -> int:
               ignoradas_duplicata=len(ign_dup), ignoradas_relevancia=len(ign_rel),
               com_ttps=com_ttps, com_iocs=com_iocs,
               nessus_matches=nessus_meta.get("matches", 0))
+    slog.emit("REPORT", f"Boletim gerado ({len(noticias)} noticias, {added} catalogadas)",
+              pdf=pdf, noticias=len(noticias), catalogadas=added,
+              com_ttps=com_ttps, com_iocs=com_iocs)
+    _end(f"argus-cti concluido com sucesso ({len(noticias)} noticias)")
 
     print("\n== argus-cti — resumo ==")
     print(f"PDF        : {pdf}")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cliente LLM plugavel (Anthropic / OpenAI / Google Gemini) via REST.
+"""Cliente LLM plugavel (Anthropic / OpenAI / Google Gemini / OpenRouter) via REST.
 
 Design:
 - Interface unica `generate(system, user) -> str`; trocar de provedor e uma
@@ -24,6 +24,7 @@ DEFAULT_MODELS = {
     "anthropic": "claude-sonnet-4-5",
     "openai": "gpt-4o",
     "gemini": "gemini-flash-latest",
+    "openrouter": "openai/gpt-4o",   # OpenRouter exige model qualificado (vendor/model)
 }
 
 
@@ -49,6 +50,26 @@ class LLMClient:
         self.max_tokens = int(max_tokens)
         self.temperature = float(temperature)
         self.timeout = int(timeout)
+        # Acumuladores de consumo (somados a cada chamada bem-sucedida ao provedor).
+        self.tokens_in = 0
+        self.tokens_out = 0
+        self.tokens_total = 0
+        self.calls = 0
+
+    def _add_usage(self, prompt_tokens, completion_tokens, total_tokens=None) -> None:
+        """Contabiliza o consumo reportado pelo provedor (campos ausentes = 0)."""
+        pin = int(prompt_tokens or 0)
+        pout = int(completion_tokens or 0)
+        self.tokens_in += pin
+        self.tokens_out += pout
+        self.tokens_total += int(total_tokens) if total_tokens else (pin + pout)
+        self.calls += 1
+
+    def usage(self) -> dict:
+        """Resumo de consumo da execucao (para o log/relatorio)."""
+        return {"provider": self.provider, "model": self.model, "calls": self.calls,
+                "tokens_in": self.tokens_in, "tokens_out": self.tokens_out,
+                "tokens_total": self.tokens_total}
 
     def generate(self, system: str, user: str) -> str:
         last: Exception | None = None
@@ -99,6 +120,8 @@ class AnthropicClient(LLMClient):
             timeout=self.timeout)
         r.raise_for_status()
         data = r.json()
+        u = data.get("usage") or {}
+        self._add_usage(u.get("input_tokens"), u.get("output_tokens"))
         return "".join(b.get("text", "") for b in data.get("content", []))
 
     def list_models(self) -> list[str]:
@@ -113,12 +136,19 @@ class AnthropicClient(LLMClient):
 class OpenAIClient(LLMClient):
     provider = "openai"
     key_env = "OPENAI_API_KEY"
+    # Endpoints da API estilo OpenAI (subclasses trocam so a base para reaproveitar
+    # o mesmo contrato chat/completions — ex.: OpenRouter).
+    chat_url = "https://api.openai.com/v1/chat/completions"
+    models_url = "https://api.openai.com/v1/models"
+
+    def _headers(self) -> dict:
+        """Auth Bearer + extras opcionais do provedor (sobrescrever nas subclasses)."""
+        return {"Authorization": f"Bearer {self._key}", "content-type": "application/json"}
 
     def _call(self, system: str, user: str) -> str:
         r = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {self._key}",
-                     "content-type": "application/json"},
+            self.chat_url,
+            headers=self._headers(),
             json={"model": self.model, "max_tokens": self.max_tokens,
                   "temperature": self.temperature,
                   "messages": [{"role": "system", "content": system},
@@ -126,15 +156,33 @@ class OpenAIClient(LLMClient):
             timeout=self.timeout)
         r.raise_for_status()
         data = r.json()
+        u = data.get("usage") or {}
+        self._add_usage(u.get("prompt_tokens"), u.get("completion_tokens"),
+                        u.get("total_tokens"))
         choices = data.get("choices") or []
         return (choices[0].get("message") or {}).get("content", "") if choices else ""
 
     def list_models(self) -> list[str]:
-        r = requests.get("https://api.openai.com/v1/models",
-                         headers={"Authorization": f"Bearer {self._key}"},
-                         timeout=self.timeout)
+        r = requests.get(self.models_url, headers=self._headers(), timeout=self.timeout)
         r.raise_for_status()
         return sorted(m.get("id", "") for m in r.json().get("data", []))
+
+
+class OpenRouterClient(OpenAIClient):
+    """Roteador multi-modelo (OpenRouter): mesma API chat/completions da OpenAI,
+    so muda a base e a chave. Modelos sao qualificados: 'anthropic/claude-...',
+    'openai/gpt-4o', 'google/gemini-...', etc. — veja openrouter.ai/models."""
+
+    provider = "openrouter"
+    key_env = "OPENROUTER_API_KEY"
+    chat_url = "https://openrouter.ai/api/v1/chat/completions"
+    models_url = "https://openrouter.ai/api/v1/models"
+
+    def _headers(self) -> dict:
+        # HTTP-Referer / X-Title sao opcionais (ranking do OpenRouter); nao vazam segredo.
+        h = super()._headers()
+        h["X-Title"] = "argus-cti"
+        return h
 
 
 class GeminiClient(LLMClient):
@@ -154,6 +202,9 @@ class GeminiClient(LLMClient):
             timeout=self.timeout)
         r.raise_for_status()
         data = r.json()
+        u = data.get("usageMetadata") or {}
+        self._add_usage(u.get("promptTokenCount"), u.get("candidatesTokenCount"),
+                        u.get("totalTokenCount"))
         cands = data.get("candidates") or []
         parts = ((cands[0].get("content") or {}).get("parts") or []) if cands else []
         return "".join(p.get("text", "") for p in parts)
@@ -177,6 +228,7 @@ _REGISTRY: dict[str, type[LLMClient]] = {
     "gpt": OpenAIClient,
     "gemini": GeminiClient,
     "google": GeminiClient,
+    "openrouter": OpenRouterClient,
 }
 
 
@@ -188,7 +240,7 @@ def create_client(cfg: dict, env: dict) -> LLMClient:
     if cls is None:
         raise LLMError(
             f"Provedor LLM '{provider or '(vazio)'}' nao suportado. "
-            "Use no config.yaml: anthropic | openai | gemini"
+            "Use no config.yaml: anthropic | openai | gemini | openrouter"
         )
     model = str(llm.get("model") or DEFAULT_MODELS[cls.provider])
     return cls(model=model, api_key=env.get(cls.key_env, ""),

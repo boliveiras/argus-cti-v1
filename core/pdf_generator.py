@@ -7,7 +7,7 @@ Nessus sao tratados como NAO confiaveis e escapados antes de renderizar.
 """
 
 import os
-from datetime import date
+from datetime import date, datetime
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
@@ -312,7 +312,9 @@ def generate_pdf(noticias, paths, modo="GERAL", technologies=None,
     """Monta o boletim e devolve o caminho do PDF gerado."""
     technologies = technologies or []
     today = date.today()
-    nome_pdf = today.strftime("%d-%m-%Y") + ".pdf"
+    # Nome com data + hora do run (DD-MM-AAAA-HH-MM) para nao sobrescrever
+    # boletins gerados no mesmo dia em execucoes diferentes.
+    nome_pdf = datetime.now().strftime("%d-%m-%Y-%H-%M") + ".pdf"
     caminho_pdf = output_path or os.path.join(paths["reports"], nome_pdf)
     os.makedirs(os.path.dirname(caminho_pdf) or ".", exist_ok=True)
 
@@ -344,14 +346,16 @@ def generate_pdf(noticias, paths, modo="GERAL", technologies=None,
         canvas.drawCentredString(W / 2, H - 0.75 * cm, "BOLETIM DIARIO DE CYBER THREAT INTELLIGENCE")
         badge_w = 2.0 * cm
         badge_x = W - MARGIN - badge_w
+        # Badge TLP no topo da faixa; a data/pagina fica logo abaixo com folga
+        # tanto do badge quanto da borda inferior (evita corte/sobreposicao).
         canvas.setFillColor(tlp_bg)
-        canvas.rect(badge_x, H - 1.1 * cm, badge_w, 0.55 * cm, fill=1, stroke=0)
+        canvas.rect(badge_x, H - 0.92 * cm, badge_w, 0.5 * cm, fill=1, stroke=0)
         canvas.setFont("Helvetica-Bold", 7)
         canvas.setFillColor(tlp_fg)
-        canvas.drawCentredString(badge_x + badge_w / 2, H - 0.82 * cm, tlp_label)
+        canvas.drawCentredString(badge_x + badge_w / 2, H - 0.68 * cm, tlp_label)
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(A_STEEL)
-        canvas.drawRightString(W - MARGIN, H - 1.22 * cm,
+        canvas.drawRightString(W - MARGIN, H - 1.14 * cm,
                                today.strftime("%d/%m/%Y") + f"  |  p. {doc.page}")
         canvas.setFillColor(A_DARK)
         canvas.rect(0, 0, W, 0.8 * cm, fill=1, stroke=0)

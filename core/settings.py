@@ -25,10 +25,11 @@ DEFAULT_PATHS = {
     "catalog": "./catalog/catalogo-cti.xlsx",     # catalogo Excel (dedup + relevancia)
     "nessus_db": "./nessus/db",                   # snapshots SQLite do Tenable/Nessus
     "logs": "./logs",                             # logs estruturados JSONL
+    "syslog": "./log",                            # logs syslog RFC 5424 (SIEM/coletor)
 }
 
 ENV_KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
-            "TENABLE_ACCESS_KEY", "TENABLE_SECRET_KEY")
+            "OPENROUTER_API_KEY", "TENABLE_ACCESS_KEY", "TENABLE_SECRET_KEY")
 
 
 def load_env(base_dir: str = BASE_DIR) -> dict:
@@ -80,6 +81,7 @@ def resolve_paths(cfg: dict, base_dir: str = BASE_DIR) -> dict:
     os.makedirs(os.path.dirname(paths["catalog"]) or ".", exist_ok=True)
     os.makedirs(paths["nessus_db"], exist_ok=True)
     os.makedirs(paths["logs"], exist_ok=True)
+    os.makedirs(paths["syslog"], exist_ok=True)
     return paths
 
 

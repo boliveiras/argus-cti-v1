@@ -84,7 +84,7 @@ flowchart TB
         P --> K
         T[core/tenable_sync.py] --> P
     end
-    L[core/llm_client.py<br/>Anthropic / OpenAI / Gemini] --> C
+    L[core/llm_client.py<br/>Anthropic / OpenAI / Gemini / OpenRouter] --> C
     Y --> nucleo
     Z --> L
     Z --> T
@@ -124,15 +124,21 @@ não gera boletim duplicado.
 
 ```yaml
 llm:
-  provider: anthropic     # anthropic | openai | gemini
+  provider: anthropic     # anthropic | openai | gemini | openrouter
   model: claude-sonnet-4-5
 ```
 
-| provider  | chave no .env       | exemplo de modelo  |
-|-----------|---------------------|--------------------|
-| anthropic | `ANTHROPIC_API_KEY` | claude-sonnet-4-5  |
-| openai    | `OPENAI_API_KEY`    | gpt-4o             |
-| gemini    | `GEMINI_API_KEY`    | gemini-flash-latest |
+| provider   | chave no .env         | exemplo de modelo        |
+|------------|-----------------------|--------------------------|
+| anthropic  | `ANTHROPIC_API_KEY`   | claude-sonnet-4-5        |
+| openai     | `OPENAI_API_KEY`      | gpt-4o                   |
+| gemini     | `GEMINI_API_KEY`      | gemini-flash-latest      |
+| openrouter | `OPENROUTER_API_KEY`  | openai/gpt-4o            |
+
+> **OpenRouter** roteia dezenas de modelos por uma única chave; o `model` é
+> qualificado por vendor (`anthropic/claude-3.5-sonnet`, `google/gemini-2.0-flash`,
+> `meta-llama/llama-3.3-70b-instruct`, …). Catálogo em `openrouter.ai/models`
+> ou via `python argus_cti.py --list-models`.
 
 ### Escolhendo onde salvar
 
@@ -172,10 +178,11 @@ ataque e menos manutenção. As externas que ficaram têm motivo: `requests`
 (HTTP com timeout decente), `reportlab` (PDF vetorial), `openpyxl` (Excel com
 estilo e dropdown) e `PyYAML` (config legível).
 
-**LLM via REST puro, sem SDKs.** Os três provedores são chamados com
-`requests` direto na API. Isso mantém o cliente com ~150 linhas, evita três
-SDKs pesados no `requirements.txt` e deixa óbvio o que sai da máquina (título
-e texto do artigo; nunca segredos, nunca dados do Nessus).
+**LLM via REST puro, sem SDKs.** Os provedores são chamados com
+`requests` direto na API. Isso mantém o cliente enxuto, evita SDKs pesados no
+`requirements.txt` e deixa óbvio o que sai da máquina (título e texto do
+artigo; nunca segredos, nunca dados do Nessus). OpenRouter reaproveita o mesmo
+contrato `chat/completions` da OpenAI — só muda a URL-base e a chave.
 
 **LLM como analista, código como auditor.** A decisão de arquitetura mais
 importante do projeto: o LLM sugere, mas quem valida é código determinístico.

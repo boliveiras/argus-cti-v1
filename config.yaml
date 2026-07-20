@@ -4,10 +4,10 @@
 # ============================================================================
 
 # -- LLM (curador) -----------------------------------------------------------
-# provider: anthropic | openai | gemini   (chave correspondente no .env)
+# provider: anthropic | openai | gemini | openrouter   (chave correspondente no .env)
 llm:
   provider: gemini
-  model: gemini-pro-latest        # ex: gpt-4o (openai) | gemini-2.5-flash (gemini)
+  model: gemini-pro-latest        # ex: gpt-4o (openai) | openai/gpt-4o (openrouter)
   max_tokens: 8000
   temperature: 0.2
   timeout: 200        # segundos por chamada (modelos com 'thinking' podem demorar)
